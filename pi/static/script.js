@@ -37,6 +37,11 @@ function update_status(json) {
   $("#analog4").html(s["analog"][4])
   $("#analog5").html(s["analog"][5])
 
+  $("#encoder0").html(s["encoders"][0])
+  $("#error0").html(s["encoders"][1])
+  $("#encoder1").html(s["encoders"][2])
+  $("#error1").html(s["encoders"][3])
+
   setTimeout(poll, 100)
 }
 
