@@ -1,6 +1,7 @@
 #include <Servo.h>
 #include <AStar32U4.h>
 #include <PololuRPiSlave.h>
+#include "Encoders.h"
 
 /* This example program shows how to make the A-Star 32U4 Robot
  * Controller into a Raspberry Pi I2C slave.  The RPi and A-Star can
@@ -26,15 +27,17 @@
 
 struct Data
 {
-  bool yellow, green, red;
-  bool buttonA, buttonB, buttonC;
+  bool yellow, green, red; // bytes 0 1 2
+  bool buttonA, buttonB, buttonC; // bytes 3 4 5
 
-  int16_t leftMotor, rightMotor;
-  uint16_t batteryMillivolts;
-  uint16_t analog[6];
+  int16_t leftMotor, rightMotor; // bytes 67 89
+  uint16_t batteryMillivolts; // bytes 10 11
+  uint16_t analog[6]; // bytes 12-23
 
-  bool playNotes;
-  char notes[14];
+  bool playNotes; // byte 24
+  char notes[14]; // bytes 25-38
+  int16_t leftEncoder, rightEncoder; // bytes 39-42
+  int16_t leftEncoderErrors, rightEncoderErrors; // bytes 43-46
 };
 
 PololuRPiSlave<struct Data,0> slave;
@@ -44,6 +47,9 @@ AStar32U4ButtonA buttonA;
 AStar32U4ButtonB buttonB;
 AStar32U4ButtonC buttonC;
 
+int8_t last_encoder1;
+int8_t last_encoder2;
+
 void setup()
 {
   // Set up the slave at I2C address 20.
@@ -51,6 +57,8 @@ void setup()
 
   // Play startup sound.
   buzzer.play("v10>>g16>>>c16");
+
+  Encoders::init();
 }
 
 void loop()
@@ -63,6 +71,12 @@ void loop()
   slave.buffer.buttonA = buttonA.isPressed();
   slave.buffer.buttonB = buttonB.isPressed();
   slave.buffer.buttonC = buttonC.isPressed();
+  slave.buffer.leftEncoder += (int8_t)(Encoders::count1 - last_encoder1);
+  slave.buffer.rightEncoder += (int8_t)(Encoders::count2 - last_encoder2);
+  last_encoder1 = Encoders::count1;
+  last_encoder2 = Encoders::count2;
+  slave.buffer.leftEncoderErrors = Encoders::error1;
+  slave.buffer.rightEncoderErrors = Encoders::error2;
 
   // Change this to readBatteryMillivoltsLV() for the LV model.
   slave.buffer.batteryMillivolts = readBatteryMillivoltsSV();
@@ -72,7 +86,7 @@ void loop()
     slave.buffer.analog[i] = analogRead(i);
   }
 
-  // READING the buffer is allowed before or after finalizeWrites().
+  // READING the buffer is allowed before or after finishWrites().
   ledYellow(slave.buffer.yellow);
   ledGreen(slave.buffer.green);
   ledRed(slave.buffer.red);
